@@ -1,0 +1,79 @@
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: recipes_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: recipes_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: recipes_user
+      MYSQL_PASSWORD: recipes_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./recipes_db.sql:/docker-entrypoint-initdb.d/recipes_db.sql
+    networks:
+      - recipes_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    environment:
+      - PMA_HOST=recipes_db
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_USER=recipes_user
+      - MYSQL_PASSWORD=recipes_password
+    networks:
+      - recipes_network
+
+  # PHP Backend API
+  backend:
+    build: 
+      context: ./recipes-api
+      dockerfile: Dockerfile
+    container_name: recipes_backend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=recipes_user
+      - DB_PASSWORD=recipes_password
+      - DB_NAME=recipes_db
+    volumes:
+      - ./recipes-api:/var/www/html
+    networks:
+      - recipes_network
+
+  # React Frontend
+  frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: recipes_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_KEY=ffcc0ec1ebab4798bc14d686085a2942
+      - VITE_BACKEND_URL=http://localhost:8080
+    networks:
+      - recipes_network
+
+volumes:
+  db_data:
+
+networks:
+  recipes_network:
+    driver: bridge
